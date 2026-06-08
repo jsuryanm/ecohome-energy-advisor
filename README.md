@@ -1,142 +1,254 @@
 # EcoHome Energy Advisor
 
-An agentic AI assistant that helps homeowners understand and optimize their home
-energy use. It answers questions about historical energy consumption, solar
-generation, electricity pricing, and weather, and gives grounded energy-saving
-advice by retrieving from a small knowledge base of best practices.
+EcoHome Energy Advisor is a small AI project that helps answer home energy
+questions. You can ask things like when to charge an electric vehicle, when to
+run an appliance, or how to reduce electricity costs.
 
-The agent is a **LangChain tool-calling (ReAct) agent**: given a natural-language
-question, it decides which tool(s) to call, runs them, and synthesizes a grounded
-answer. Its retrieval-and-answer quality and its tool-selection behaviour are both
-evaluated with **Ragas**.
+The project works by combining an OpenAI chat model with a set of local tools.
+Those tools can read sample home energy data, check sample solar generation,
+look up mock weather and electricity prices, search energy-saving documents, and
+estimate savings.
 
-## What it does
+This is a demonstration project. Weather and electricity prices are mocked, so
+the answers are useful for learning how the solution works, not for making real
+utility decisions.
 
-- **Query energy usage** from a SQLite database (by date range, optionally per device type).
-- **Query solar generation** history (production, weather, irradiance).
-- **Summarize recent energy** use and generation across devices.
-- **Look up weather forecasts** and **time-of-use electricity prices** (mocked data sources).
-- **Search energy-saving tips** via RAG over best-practice documents.
-- **Estimate savings** (kWh, $, %) from a proposed optimization.
+## What This Project Does
 
-## Tech stack
+- Answers home energy optimization questions in plain language.
+- Uses tool calls to gather data before writing a recommendation.
+- Stores sample energy and solar data in a local SQLite database.
+- Stores energy-saving documents in a Chroma vector database for retrieval.
+- Runs a set of test questions and creates an evaluation report.
 
-| Layer | Choice |
-| --- | --- |
-| Orchestration | LangGraph (`create_react_agent`) |
-| LLM | Groq (if `GROQ_API_KEY` set) with OpenAI `gpt-4o-mini` fallback |
-| Tools / framework | LangChain (`@tool`) |
-| Vector store | Chroma (`langchain-chroma`) |
-| Embeddings | OpenAI `text-embedding-3-small` |
-| Database / ORM | SQLite via SQLAlchemy |
-| Evaluation | Ragas 0.4.3 (`ragas.metrics.collections`) |
-| Runtime | Python 3.12 |
+Example questions:
 
-## Project structure
+- "When should I charge my electric car tomorrow?"
+- "When should I run my dishwasher to save money?"
+- "How can I make better use of my solar panels?"
+- "What is the single most impactful way to lower my energy bill?"
 
+## How The Solution Works
+
+The project is split into three notebooks and a few Python files.
+
+1. `01_db_setup.ipynb` creates `data/energy_data.db` and fills it with sample
+   home energy usage and solar generation records.
+2. `02_rag_setup.ipynb` loads the text files in `data/documents/`, splits them
+   into chunks, creates embeddings, and saves them in a local Chroma vector
+   store.
+3. `03_run_and_evaluate.ipynb` creates the energy advisor agent, asks it several
+   test questions, and evaluates the responses.
+4. `agent.py` builds the LangChain agent that talks to the OpenAI model and uses
+   the tools.
+5. `tools.py` defines the seven tools the agent can call.
+6. `models/energy.py` defines the SQLite tables and database helper methods.
+
+At runtime, the flow looks like this:
+
+```text
+User question
+    -> Agent decides which tool to use
+    -> Tool reads database, vector store, mock weather, or mock price data
+    -> Agent combines the tool results
+    -> Final energy-saving answer is returned
 ```
+
+## Project Files
+
+```text
 .
-├── 01_db_setup.ipynb          # Create SQLite schema + seed sample energy/solar data
-├── 02_rag_setup.ipynb         # Build & persist the Chroma vector store from tip docs
-├── 03_run_and_evaluate.ipynb  # Run the agent + evaluate with Ragas (RAG + trajectory)
-├── agent.py                   # EcoHomeAgent: LangGraph ReAct agent over the tool kit
-├── tools.py                   # The 7 agent tools (DB queries, weather, pricing, RAG, savings)
-├── models/
-│   └── energy.py              # SQLAlchemy models + DatabaseManager
-├── data/
-│   ├── documents/             # Source knowledge-base text files
-│   ├── energy_data.db          # (generated) SQLite database
-│   └── vectorstore/            # (generated) persisted Chroma store
-├── requirements.txt
-├── pyproject.toml
-└── .env                        # API keys (not committed)
+|-- 01_db_setup.ipynb          Create and populate the SQLite database
+|-- 02_rag_setup.ipynb         Build the Chroma vector store from text documents
+|-- 03_run_and_evaluate.ipynb  Run the agent and evaluate the results
+|-- agent.py                   Creates the OpenAI-powered LangChain agent
+|-- tools.py                   Contains the agent tools
+|-- main.py                    Small starter file
+|-- template.py                Creates the project file structure
+|-- models/
+|   |-- __init__.py
+|   `-- energy.py              SQLAlchemy database models and manager
+|-- data/
+|   |-- energy_data.db         Local SQLite database
+|   `-- documents/             Energy-saving text documents
+|-- requirements.txt           pip dependency list
+|-- pyproject.toml             uv/project dependency configuration
+|-- .env.example               Example environment variable file
+`-- README.md                  Project guide
 ```
 
-## How the pieces fit together
+## Tech Stack
 
-1. `01_db_setup.ipynb` populates `data/energy_data.db` with ~30 days of synthetic
-   hourly energy-usage and solar-generation records.
-2. `02_rag_setup.ipynb` loads the two tip documents, chunks them, embeds the chunks,
-   and persists them to `data/vectorstore` (Chroma). The agent's `search_energy_tips`
-   tool reads this store back at runtime.
-3. `agent.py` builds a LangGraph ReAct agent over the seven tools in `tools.py` with
-   a system prompt that tells it to ground every answer in tool output.
-4. `03_run_and_evaluate.ipynb` runs the agent and evaluates it (see below).
+| Technology | What it is used for |
+| --- | --- |
+| Python 3.12 | Main programming language |
+| Jupyter Notebook | Step-by-step setup, running, and evaluation |
+| LangChain / LangGraph | Agent workflow and tool calling |
+| OpenAI / `langchain-openai` | Chat model and embeddings |
+| SQLite | Local database for energy and solar data |
+| SQLAlchemy | Python interface for the SQLite database |
+| ChromaDB | Local vector store for energy-saving documents |
+| Pandas / NumPy | Data handling and evaluation summaries |
+| python-dotenv | Loading API keys from `.env` |
 
-## Evaluation
+## Setup Instructions
 
-Evaluation lives in `03_run_and_evaluate.ipynb` and uses the modern Ragas 0.4.x
-**collections API** (`from ragas.metrics.collections import ...`, async
-`await metric.ascore(...)`, with `llm_factory` / `embedding_factory` over an
-`AsyncOpenAI` client).
+These steps are written for Windows PowerShell.
 
-**Part A - RAG quality.** A small retrieve-then-answer pipeline over the energy-tips
-knowledge base is scored on:
+### 1. Open the project folder
 
-- **Faithfulness** - is the answer grounded in the retrieved context?
-- **Answer Relevancy** - does the answer actually address the question?
-- **Context Precision** - is the retrieved context relevant (vs. a reference answer)?
-- **Factual Correctness** - F1 of the answer's claims against a reference answer.
+```powershell
+cd "C:\Users\rsurs\OneDrive\Documents\Root\ecohome_solution"
+```
 
-**Part B - Agent trajectory.** Whether the agent routes each query to the correct
-tool, scored two ways:
+### 2. Check Python
 
-- **Trajectory match** - deterministic check that the expected tool appears in the
-  agent's tool-call sequence (robust to argument differences).
-- **Ragas `ToolCallAccuracy`** - converts the LangGraph message trace via
-  `convert_to_ragas_messages` and compares against reference `ToolCall`s. This is
-  stricter: it scores tool *name* and *arguments*, so dynamic args (e.g. dates) can
-  legitimately lower the score.
+The project expects Python 3.12 or newer.
 
-Results are collected into pandas DataFrames with per-question rows and mean scores.
+```powershell
+python --version
+```
 
-## Setup & run
+### 3. Create and activate a virtual environment
 
-### 1. Environment
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
 
-Requires Python 3.12. Using [uv](https://docs.astral.sh/uv/) (recommended):
+If PowerShell blocks activation, run this command once in the same terminal:
 
-```bash
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Then activate the environment again:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+### 4. Install dependencies
+
+If you use `uv`, run:
+
+```powershell
 uv sync
 ```
 
-Or with pip:
+If you use `pip`, run:
 
-```bash
-python -m venv .venv && source .venv/bin/activate
+```powershell
 pip install -r requirements.txt
 ```
 
-> Ragas 0.4.3 is required for the collections API used in the evaluation notebook
-> (`pip install "ragas>=0.4.3"` if your lockfile pins an older version).
+### 5. Create the `.env` file
 
-### 2. API keys
+Copy the example file:
 
-Copy `.env.example` to `.env` and fill in:
-
-```
-OPENAI_API_KEY=sk-...          # required (embeddings + Ragas evaluator; default LLM)
-# GROQ_API_KEY=...             # optional; if set, the agent uses Groq instead of OpenAI
-# OPEN_WEATHER_MAP_API_KEY=... # optional; weather/pricing tools currently use mock data
+```powershell
+Copy-Item .env.example .env
 ```
 
-### 3. Run the notebooks in order
+Open `.env` and add your OpenAI API key:
 
+```text
+OPENAI_API_KEY=your_api_key_here
 ```
-01_db_setup.ipynb   ->   02_rag_setup.ipynb   ->   03_run_and_evaluate.ipynb
+
+The OpenAI key is needed for the chat model and embeddings.
+
+## How To Run The Project
+
+Run the notebooks in this order:
+
+```text
+01_db_setup.ipynb
+02_rag_setup.ipynb
+03_run_and_evaluate.ipynb
 ```
 
-You can also smoke-test the agent directly:
+The order matters:
 
-```bash
-python agent.py
+1. The first notebook creates the database.
+2. The second notebook creates the vector store.
+3. The third notebook uses both of those resources to run the agent.
+
+To open Jupyter Notebook from PowerShell:
+
+```powershell
+jupyter notebook
+```
+
+Then open each notebook in the browser and run the cells from top to bottom.
+
+You can also open the project in VS Code and run the notebooks there. Make sure
+the selected notebook kernel uses the `.venv` environment.
+
+## How Evaluation Works
+
+`03_run_and_evaluate.ipynb` includes a list of test questions for the energy
+advisor. For each test case, the notebook:
+
+1. Sends the question to the agent.
+2. Saves the agent response and message trace.
+3. Checks whether the answer is relevant and useful.
+4. Checks whether the expected tools were used.
+5. Builds a final report with scores and feedback.
+
+The current evaluation uses simple Python heuristics. It checks things like
+whether important words from the question and expected answer appear in the final
+response, and whether expected tools are present in the tool trace.
+
+This keeps the evaluation easy to understand for a beginner project. It is not a
+perfect measurement of answer quality, but it gives a useful quick check.
+
+## Troubleshooting
+
+### `OPENAI_API_KEY` is missing
+
+Make sure `.env` exists and contains:
+
+```text
+OPENAI_API_KEY=your_api_key_here
+```
+
+Also make sure the notebook was restarted after editing `.env`.
+
+### The agent cannot find database records
+
+Run `01_db_setup.ipynb` again from top to bottom. This recreates and fills the
+local SQLite database.
+
+### Search or document retrieval does not work
+
+Run `02_rag_setup.ipynb` again from top to bottom. This rebuilds the local Chroma
+vector store.
+
+### `03_run_and_evaluate.ipynb` gives empty or poor results
+
+Check that the first two notebooks were completed successfully. The evaluation
+notebook depends on both the database and the vector store.
+
+### PowerShell cannot activate `.venv`
+
+Run:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Then try:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
 ```
 
 ## Notes
 
-- The weather and electricity-pricing tools return realistic **mock** data; swap in a
-  real API (e.g. OpenWeatherMap) without changing the agent.
-- `search_energy_tips` lazily builds the vector store on first use if `02_rag_setup`
-  hasn't been run, but running the notebook first is recommended for a clean build.
-- The embedding model is pinned (`text-embedding-3-small`) in both `tools.py` and
-  `02_rag_setup.ipynb` so the store is written and read in the same embedding space.
+- Weather and electricity prices are mocked in `tools.py`.
+- The sample database is local and safe to recreate.
+- The vector store is built from the text files in `data/documents/`.
+- This project is designed for learning agent tools, RAG, notebooks, and
+  evaluation.
+- For real-world use, replace the mock weather and price tools with real APIs.
