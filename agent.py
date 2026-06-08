@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage,HumanMessage
 from langchain.agents import create_agent 
 
 from tools import TOOL_KIT
@@ -18,7 +18,7 @@ class Agent:
                          api_key=os.getenv("OPENAI_API_KEY"))
         
         self.graph = create_agent(model=llm,
-                                  system_prompt=SystemMessage(content=instructions),
+                                  system_prompt=instructions,
                                   tools=TOOL_KIT,
                                   name="energy_advisor")
     
@@ -35,9 +35,9 @@ class Agent:
         """
         messages = []
         if context:
-            messages.append("system",context)
+            messages.append(SystemMessage(content=context))
         
-        messages.append(("user",question))
+        messages.append(HumanMessage(content=question))
         response = self.graph.invoke({"messages":messages})
         return response 
     
