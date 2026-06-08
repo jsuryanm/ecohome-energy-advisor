@@ -21,6 +21,7 @@ dependencies = [
     "numpy>=2.4.6",
     "openai>=2.41.0",
     "pandas>=3.0.3",
+    "pillow>=12.2.0",
     "python-dotenv>=1.2.2",
     "ragas>=0.3.1",
     "requests>=2.34.2",
