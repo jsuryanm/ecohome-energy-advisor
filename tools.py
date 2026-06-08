@@ -8,7 +8,10 @@ from langchain.tools import tool
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+
 from models.energy import DatabaseManager
+
 
 db_manager = DatabaseManager()
 
@@ -319,7 +322,8 @@ def search_energy_tips(query: str, max_results: int = 5) -> Dict[str, Any]:
             splits = text_splitter.split_documents(documents)
             
             # Create vector store
-            embeddings = OpenAIEmbeddings()
+            embeddings = OpenAIEmbeddings(model="text-embedding-3-small",
+                                          api_key=os.getenv("OPENAI_API_KEY"))
             vectorstore = Chroma.from_documents(
                 documents=splits,
                 embedding=embeddings,
@@ -327,7 +331,8 @@ def search_energy_tips(query: str, max_results: int = 5) -> Dict[str, Any]:
             )
         else:
             # Load existing vector store
-            embeddings = OpenAIEmbeddings()
+            embeddings = OpenAIEmbeddings(model="text-embedding-3-small",
+                                          api_key=os.getenv("OPENAI_API_KEY"))
             vectorstore = Chroma(
                 persist_directory=persist_directory,
                 embedding_function=embeddings
